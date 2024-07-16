@@ -1,6 +1,7 @@
 ---
 title: "mini Genome Wide Association Study (GWAS)"
 output:
+  rmarkdown::github_ducoment
   pdf_document: default
   html_document: default
 date: "2022-11-06"
