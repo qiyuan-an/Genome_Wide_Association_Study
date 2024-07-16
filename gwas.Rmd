@@ -1,0 +1,118 @@
+---
+title: "mini Genome Wide Association Study (GWAS)"
+output:
+  pdf_document: default
+  html_document: default
+date: "2022-11-06"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+1.  In Rstudio, make a new R markdown document. Write all comments and answers to questions outside of chunks and write all code inside of chunks.
+
+```{r}
+require(parathyroidSE)
+data(parathyroidGenesSE)
+parathyroidGenesSE
+```
+
+# load libraries
+
+```{r pressure, echo=FALSE}
+require(DESeq2)
+require(airway)
+require(pheatmap)
+require(ggplot2)
+require(apeglm)
+require(EnhancedVolcano)
+require(AnnotationDbi)
+require(org.Hs.eg.db)
+require(goseq)
+require(tidyverse)
+require(gplots)
+```
+
+2.  Install and load the parathyroidSE package. Take the last four digits of your student ID. With each digit corresponding to a sample, subset the dataset so that it only contains the samples that are in the last four digits of your student ID. Make a new column in the Sample table (colData()) called Comparison, and add to it the following values c("a","a","b","b"). % <https://www.dataquest.io/blog/add-column-to-dataframe-in-r/>
+
+A: My last four digits are 5560. 
+
+```{r}
+# samples <- colData(parathyroidGenesSE, stringsAsFactors = FALSE)
+last_chars <-sapply(strsplit(as.character(colData(parathyroidGenesSE)$sample), ""), tail, 1)
+matchfor <- c("5","6","0")
+
+data <- parathyroidGenesSE[,last_chars %in% matchfor]  # row: genes, columns: samples
+num_matches <- sum(last_chars %in% matchfor)
+colData(data)$Comparison <-c(rep("a",num_matches/2), rep("b",num_matches/2))
+colData(data)
+```
+
+3. Get the dataset into a DESeqDataSet object and filter the dataset for lowly expressed genes.
+
+```{r}
+dds <- DESeqDataSet(data, design = ~Comparison)
+
+nrow(dds)
+keep <- rowSums(counts(dds)) > 1
+dds <- dds[keep,]
+nrow(dds)
+```
+
+4.  Perform a rlog transformation on the dataset and generate a heatmap of the top 100 expressed genes and Principal component plot, justify why or why not each sample likely represents the new Treatment column that you have added and if you should throw out any samples.
+
+A: If we find red and blue dots are together in the PCA plot, we might identify bad samples and we can throw them away.
+
+```{r}
+rld <- rlog(dds, blind=F)
+rld
+topVarGenes <- head(order(-rowVars(assay(rld))), 100)
+topVarGenes
+heatmap.2(x=assay(rld)[topVarGenes,])
+```
+
+```{r}
+# plotPCA(rld,intgroup=c("treatment", "Comparison"))
+
+pcaData <- plotPCA(rld,intgroup="Comparison",returnData=T)
+pcaData
+ggplot(pcaData, aes(x=PC1,y=PC2, color=Comparison, shape=Comparison)) +geom_point(size=5)
+```
+5.  Generate a differential expression analysis looking for differentially expressed genes in the "b" treatment as compared to the "a" treatment. How many genes are differentially expressed with a LF C > 2 and an FDR adjusted p - value < 0.05? Show the top 10 most differentially expressed genes. Plot the results in a volcano plot using the enhancedVolcano package.
+
+A: 227 genes are differentially expressed. Please check the gene_list.csv for all exported genes.
+
+```{r}
+dds <- DESeq(dds)
+res <- results(dds,contrast=c("Comparison", "a", "b"))
+subres <- subset(res, log2FoldChange>2 & padj < 0.05)
+head(subres[order(subres$padj),], 10)
+
+```
+Volcano plot:
+```{r}
+EnhancedVolcano(res, lab=rownames(res), x='log2FoldChange',y='pvalue',pCutoff=subres$padj,FCcutoff = 2)
+```
+6.  Using shinyGO: www.bioinformatics.sdstate.edu/go, determine if there is any GO pathways that are enriched among differentially expressed genes. If there are, import any table that shinyGO outputs into R studio and print it.
+
+A: shinygo returned "No significant enrichment found!"
+
+7.  If there are differentially expressed genes and enriched pathways, explain how the original treatment and factor conditions of the samples you compared could have effected this or if there aren't, justify why there are no differentially expressed genes.
+
+A: We find 227 significant genes but no pathways found. It means we can't identify biological pathways that are enriched in the gene list more than would be expected by chance.
+
+```{r}
+# write.csv(subres, "gene_list.csv", row.names = T)
+```
+
+8.  Finally, compile the markdown document into a PDF document and upload it to Canvas. Submit both this file and a file containing the code.
+
+# Difficulty adjustment
+
+How long did this assignment take you to complete?
+5 hours.
+
+If the assignment took you longer than the 10 hours, which parts were overly difficult?
